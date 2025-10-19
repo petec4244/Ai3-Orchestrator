@@ -1,0 +1,56 @@
+{
+  "name": "ai3-orchestrator",
+  "displayName": "AI3 Orchestrator",
+  "description": "Multi-AI model orchestrator - One Source to Rule Them All",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "activationEvents": [
+    "onCommand:ai-orchestrator.processPrompt",
+    "onCommand:ai-orchestrator.openConfig"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-orchestrator.processPrompt",
+        "title": "AI3: Process Prompt"
+      },
+      {
+        "command": "ai-orchestrator.openConfig",
+        "title": "AI3: Open Configuration"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "ai-orchestrator.processPrompt",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.3",
+    "@vscode/vsce": "^2.19.0"
+  }
+}
