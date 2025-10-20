@@ -1,0 +1,39 @@
+[project]
+name = "ai3-orchestrator"
+version = "2.1.0"
+description = "Multi-LLM orchestration engine with intelligent routing, parallel execution, streaming, and self-verification"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "fastapi>=0.104.1",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.5.0",
+    "click>=8.1.7",
+    "anthropic>=0.7.0",
+    "openai>=1.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

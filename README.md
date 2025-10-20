@@ -15,8 +15,22 @@ Multi-LLM orchestration engine with intelligent routing, parallel execution, str
 
 ### Installation
 
+This project uses [uv](https://docs.astral.sh/uv/) for fast, reliable Python package management.
+
 ```bash
-pip install -r requirements.txt
+# Install uv if you haven't already
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync
+
+# Or if you prefer to use venv manually
+uv venv
+uv pip install -r requirements.txt
 ```
 
 ### Environment Variables
@@ -38,20 +52,20 @@ export AI3_REPAIR_LIMIT=1
 
 ```bash
 # Non-streaming
-python -m interface.cli.main "Write a 3-section blog post about AI"
+uv run python -m interface.cli.main "Write a 3-section blog post about AI"
 
 # Streaming with live progress
-python -m interface.cli.main "Write a 3-section blog post about AI" --stream
+uv run python -m interface.cli.main "Write a 3-section blog post about AI" --stream
 
 # Custom concurrency and model
-python -m interface.cli.main "Analyze this dataset" --stream --max-concurrency 10 --planner-model claude-3-7-sonnet-latest
+uv run python -m interface.cli.main "Analyze this dataset" --stream --max-concurrency 10 --planner-model claude-3-7-sonnet-latest
 ```
 
 ### API Usage
 
 ```bash
 # Start server
-uvicorn api.app:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn api.app:app --reload --host 0.0.0.0 --port 8000
 
 # Non-streaming endpoint
 curl -X POST http://localhost:8000/run \
@@ -98,12 +112,12 @@ curl -X POST http://localhost:8000/stream/run \
 
 ```bash
 # Run all tests
-pytest -q
+uv run pytest -q
 
 # Specific test suites
-pytest tests/test_planner.py -v
-pytest tests/test_scheduler.py -v
-pytest tests/test_verifier_repair.py -v
+uv run pytest tests/test_planner.py -v
+uv run pytest tests/test_scheduler.py -v
+uv run pytest tests/test_verifier_repair.py -v
 ```
 
 ## Configuration
