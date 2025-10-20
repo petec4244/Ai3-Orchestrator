@@ -1,0 +1,106 @@
+{
+  "models": {
+    "claude-3-7-sonnet-20250219": {
+      "provider": "anthropic",
+      "skills": {
+        "coding": 0.98,
+        "reasoning": 0.95,
+        "creative": 0.92,
+        "professional_writing": 0.96,
+        "document_processing": 0.98,
+        "summarization": 0.90,
+        "data_analysis": 0.85,
+        "multimodal": 0.85,
+        "research": 0.88,
+        "planning": 0.92,
+        "general": 0.93
+      },
+      "context_window": 200000,
+      "max_output_tokens": 16384,
+      "cost_per_1k_tokens": 0.003,
+      "avg_latency_ms": 2500,
+      "error_rate": 0.02,
+      "supports_streaming": true,
+      "supports_vision": true,
+      "supports_function_calling": true,
+      "notes": "Best for production code, long documents, complex reasoning"
+    },
+    "gpt-4o": {
+      "provider": "openai",
+      "skills": {
+        "coding": 0.88,
+        "reasoning": 0.87,
+        "creative": 0.85,
+        "professional_writing": 0.86,
+        "document_processing": 0.82,
+        "summarization": 0.93,
+        "data_analysis": 0.95,
+        "multimodal": 0.98,
+        "research": 0.87,
+        "planning": 0.85,
+        "general": 0.90
+      },
+      "context_window": 128000,
+      "max_output_tokens": 16384,
+      "cost_per_1k_tokens": 0.0025,
+      "avg_latency_ms": 1800,
+      "error_rate": 0.03,
+      "supports_streaming": true,
+      "supports_vision": true,
+      "supports_function_calling": true,
+      "notes": "Best for multimodal, data analysis, fast responses"
+    },
+    "grok-3": {
+      "provider": "xai",
+      "skills": {
+        "coding": 0.85,
+        "reasoning": 0.97,
+        "creative": 0.94,
+        "professional_writing": 0.82,
+        "document_processing": 0.78,
+        "summarization": 0.80,
+        "data_analysis": 0.88,
+        "multimodal": 0.75,
+        "research": 0.92,
+        "planning": 0.88,
+        "general": 0.86
+      },
+      "context_window": 131072,
+      "max_output_tokens": 8192,
+      "cost_per_1k_tokens": 0.002,
+      "avg_latency_ms": 3200,
+      "error_rate": 0.04,
+      "supports_streaming": true,
+      "supports_vision": false,
+      "supports_function_calling": true,
+      "notes": "Best for mathematical reasoning, creative insights, research"
+    },
+    "gpt-4o-mini": {
+      "provider": "openai",
+      "skills": {
+        "coding": 0.80,
+        "reasoning": 0.78,
+        "creative": 0.75,
+        "professional_writing": 0.79,
+        "document_processing": 0.76,
+        "summarization": 0.88,
+        "data_analysis": 0.82,
+        "multimodal": 0.90,
+        "research": 0.77,
+        "planning": 0.76,
+        "general": 0.82
+      },
+      "context_window": 128000,
+      "max_output_tokens": 16384,
+      "cost_per_1k_tokens": 0.00015,
+      "avg_latency_ms": 1200,
+      "error_rate": 0.05,
+      "supports_streaming": true,
+      "supports_vision": true,
+      "supports_function_calling": true,
+      "notes": "Fast and cost-effective for simpler tasks"
+    }
+  },
+  "telemetry_window_hours": 24,
+  "last_updated": "2025-10-20T00:00:00Z"
+}

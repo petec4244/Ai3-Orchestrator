@@ -1,0 +1,15 @@
+# Ai3 Orchestrator Requirements
+# Python 3.8+
+
+# AI Provider SDKs
+anthropic>=0.39.0
+openai>=1.54.0
+requests>=2.31.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Optional: Development tools
+# pytest>=7.0.0
+# black>=22.0.0
+# mypy>=0.991
