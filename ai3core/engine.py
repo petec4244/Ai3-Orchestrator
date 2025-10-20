@@ -1,334 +1,215 @@
-"""
-Ai3Engine - Main orchestration engine
-
-Coordinates all modules to process prompts intelligently:
-1. Plan → Task DAG
-2. Route → Select best models
-3. Execute → Run tasks
-4. Verify → Check quality
-5. Assemble → Combine results
-6. Journal → Persist trace
-"""
-
-import uuid
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-
-from .types import RunTrace, Task, TaskStatus, ExecutionArtifact, VerificationResult, AssembledResponse
-from .planner import Planner
-from .registry import CapabilityRegistry
-from .router import Router
-from .executor import ExecutorFactory
-from .verifier import Verifier
-from .assembler import Assembler
-from .journal import RunJournal, ArtifactStore
+import asyncio
+import time
+from typing import Dict, List, Optional, AsyncIterator
+from ai3core.planner import make_plan
+from ai3core.router.selector import select_provider
+from ai3core.executor.scheduler import compute_ready_sets, ConcurrencyLimiter
+from ai3core.providers.anthropic import AnthropicProvider
+from ai3core.providers.openai import OpenAIProvider
+from ai3core.verifier.verify import verify_artifact, should_repair, should_fallback
+from ai3core.assembler.strategies import assemble_artifacts
+from ai3core.journal.store import JournalStore
+from ai3core.telemetry.metrics import TelemetryCollector
+from ai3core.settings import AI3_MAX_CONCURRENCY, AI3_MAX_CONCURRENCY_PER_PROVIDER
 
 
-class Ai3Engine:
-    """
-    Main decision engine for multi-AI orchestration
+class Ai3Core:
+    """Production-grade v2.1 orchestration engine."""
 
-    The Ai3Engine is Stovepipe 1 - pure business logic with no UI dependencies
-    """
+    def __init__(self):
+        self.journal = JournalStore()
+        self.telemetry = TelemetryCollector()
+        self.limiter = ConcurrencyLimiter(AI3_MAX_CONCURRENCY, AI3_MAX_CONCURRENCY_PER_PROVIDER)
 
-    def __init__(self, api_keys: Dict[str, str], config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize the engine
+    def _get_provider_instance(self, provider_name: str):
+        """Instantiate provider by name."""
+        if "anthropic" in provider_name.lower():
+            return AnthropicProvider()
+        elif "openai" in provider_name.lower():
+            return OpenAIProvider()
+        else:
+            return AnthropicProvider()  # Default fallback
 
-        Args:
-            api_keys: Dict mapping provider names to API keys
-                     e.g., {"anthropic": "sk-...", "openai": "sk-...", "xai": "..."}
-            config: Optional configuration overrides
-        """
-        self.config = config or {}
+    async def _execute_task(self, task: Dict, artifacts: Dict, stream_cb=None) -> Dict:
+        """Execute a single task with verification, repair, and fallback."""
+        task_id = task["id"]
+        start_time = time.time()
 
-        # Initialize all modules
-        self.planner = Planner()
-        self.registry = CapabilityRegistry()
-        self.router = Router(self.registry)
-        self.executor_factory = ExecutorFactory(api_keys)
-        self.verifier = Verifier()
-        self.assembler = Assembler()
-        self.journal = RunJournal()
-        self.artifact_store = ArtifactStore()
+        if stream_cb:
+            await stream_cb({"type": "task_start", "task_id": task_id, "description": task.get("description")})
 
-        # Runtime state
-        self.current_run_id: Optional[str] = None
-        self.current_artifacts: List[ExecutionArtifact] = []
-        self.current_verifications: List[VerificationResult] = []
+        # Select provider
+        provider_name = select_provider(task, self.telemetry)
+        score = 1.0  # Placeholder for actual score
+        self.telemetry.record_decision(task_id, provider_name, score)
 
-    def process(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> AssembledResponse:
-        """
-        Main entry point: Process a prompt end-to-end
+        if stream_cb:
+            await stream_cb({"type": "decision", "task_id": task_id, "provider": provider_name})
 
-        Args:
-            prompt: User's input prompt
-            context: Optional additional context
+        # Execute task
+        provider = self._get_provider_instance(provider_name)
+        prompt = self._build_prompt(task, artifacts)
 
-        Returns:
-            AssembledResponse with final result
-        """
-        # Generate run ID
-        self.current_run_id = self._generate_run_id()
-        self.current_artifacts = []
-        self.current_verifications = []
+        try:
+            await self.limiter.acquire(provider_name)
+            response = await provider.generate(prompt)
+            self.limiter.release(provider_name)
 
-        start_time = datetime.now()
+            artifact = {
+                "task_id": task_id,
+                "content": response.get("content", ""),
+                "meta": {
+                    "provider": provider_name,
+                    "timestamp": time.time(),
+                    "repair_count": 0
+                }
+            }
 
-        # Step 1: Plan
-        print(f"[Ai3Core] Planning tasks...")
-        plan = self.planner.create_plan(prompt, context)
-        print(f"[Ai3Core] Created plan with {len(plan.tasks)} tasks")
-        print(self.planner.visualize_plan(plan))
+            if stream_cb:
+                await stream_cb({"type": "task_artifact", "task_id": task_id, "artifact": artifact})
 
-        # Step 2: Route
-        print(f"\n[Ai3Core] Routing tasks to models...")
-        assignments = self._route_tasks(plan)
-        for task_id, model_id in assignments.items():
-            plan.tasks[task_id].assigned_model = model_id
-            print(f"  - {plan.tasks[task_id].task_type}: {model_id}")
+            # Verify
+            quality_criteria = task.get("quality_criteria", [])
+            artifact = await verify_artifact(artifact, quality_criteria, None)
 
-        # Step 3: Execute
-        print(f"\n[Ai3Core] Executing tasks...")
-        artifacts = self._execute_tasks(plan, assignments)
-        self.current_artifacts = artifacts
+            if stream_cb:
+                await stream_cb({"type": "task_verified", "task_id": task_id, "verification": artifact["meta"]["verification"]})
 
-        # Store artifacts
-        for artifact in artifacts:
-            self.artifact_store.store(artifact)
+            # Handle repair
+            if should_repair(artifact):
+                if stream_cb:
+                    await stream_cb({"type": "task_repaired", "task_id": task_id, "attempt": artifact["meta"]["repair_count"]})
 
-        # Step 4: Verify
-        print(f"\n[Ai3Core] Verifying outputs...")
-        verifications = self._verify_artifacts(artifacts, plan.tasks)
-        self.current_verifications = verifications
+                # Create repair subtask (simplified: re-run with enhanced prompt)
+                repair_prompt = f"{prompt}\n\nPrevious attempt had issues: {artifact['meta']['verification']['failures']}. Please improve."
+                await self.limiter.acquire(provider_name)
+                repair_response = await provider.generate(repair_prompt)
+                self.limiter.release(provider_name)
 
-        # Handle failed verifications (repair logic)
-        failed = [v for v in verifications if not v.passed and v.needs_repair]
-        if failed:
-            print(f"[Ai3Core] {len(failed)} tasks need repair")
-            # For now, we'll proceed without repair
-            # In future: retry with different models or create repair tasks
+                artifact["content"] = repair_response.get("content", "")
+                artifact = await verify_artifact(artifact, quality_criteria, None)
 
-        # Step 5: Assemble
-        print(f"\n[Ai3Core] Assembling final response...")
-        final_response = self.assembler.assemble(
-            artifacts=artifacts,
-            tasks=plan.tasks,
-            verifications={v.artifact_id: v for v in verifications}
-        )
+            # Handle fallback
+            if should_fallback(artifact):
+                # Select next-best provider (simplified: pick different provider)
+                fallback_provider = "openai-gpt4" if "anthropic" in provider_name else "anthropic-claude"
+                fallback_instance = self._get_provider_instance(fallback_provider)
 
-        # Calculate costs and latencies
-        total_cost = self._calculate_total_cost(artifacts)
-        total_latency_ms = (datetime.now() - start_time).total_seconds() * 1000
+                await self.limiter.acquire(fallback_provider)
+                fallback_response = await fallback_instance.generate(prompt)
+                self.limiter.release(fallback_provider)
 
-        # Step 6: Journal
-        print(f"\n[Ai3Core] Recording run trace...")
-        trace = RunTrace(
-            run_id=self.current_run_id,
-            original_prompt=prompt,
-            plan=plan,
-            artifacts=artifacts,
-            verifications=verifications,
-            final_response=final_response,
-            total_cost=total_cost,
-            total_latency_ms=total_latency_ms,
-            timestamp=start_time,
-            metadata=context or {}
-        )
+                artifact["content"] = fallback_response.get("content", "")
+                artifact["meta"]["fallback_used"] = fallback_provider
 
-        self.journal.record(trace)
+            # Record telemetry
+            latency_ms = (time.time() - start_time) * 1000
+            cost = response.get("usage", {}).get("cost", 0.001)
+            tokens = response.get("usage", {}).get("total_tokens", 100)
+            self.telemetry.record_task(task_id, provider_name, True, latency_ms, cost, tokens)
 
-        # Update telemetry
-        self._update_telemetry(artifacts)
+            return artifact
 
-        print(f"[Ai3Core] ✓ Complete! Cost: ${total_cost:.4f}, Latency: {total_latency_ms:.0f}ms")
-        print(f"[Ai3Core] Confidence: {final_response.confidence:.2f}")
+        except Exception as e:
+            self.limiter.release(provider_name)
+            latency_ms = (time.time() - start_time) * 1000
+            self.telemetry.record_task(task_id, provider_name, False, latency_ms, 0.0, 0)
 
-        return final_response
+            if stream_cb:
+                await stream_cb({"type": "task_failed", "task_id": task_id, "error": str(e)})
 
-    def _route_tasks(self, plan) -> Dict[str, str]:
-        """Route all tasks to optimal models"""
-        assignments = {}
+            return {
+                "task_id": task_id,
+                "content": "",
+                "meta": {"provider": provider_name, "error": str(e)}
+            }
 
-        for task_id, task in plan.tasks.items():
-            # Estimate context size (simplified)
-            context_size = len(task.description) * 4  # Rough token estimate
+    def _build_prompt(self, task: Dict, artifacts: Dict) -> str:
+        """Build prompt for task, incorporating dependencies."""
+        base = task.get("description", "")
+        # Simple dependency injection (can be enhanced)
+        return base
 
-            # Route task
-            model_id = self.router.route_task(task, context_size)
-            assignments[task_id] = model_id
+    async def _execute_parallel(self, tasks: List[Dict], edges: List[Dict], stream_cb=None) -> Dict[str, Dict]:
+        """Execute tasks in parallel based on dependency graph."""
+        ready_sets = compute_ready_sets(tasks, edges)
+        artifacts = {}
+        task_map = {t["id"]: t for t in tasks}
 
-        return assignments
-
-    def _execute_tasks(self, plan, assignments: Dict[str, str]) -> List[ExecutionArtifact]:
-        """Execute all tasks in dependency order"""
-        artifacts = []
-        completed_tasks = set()
-
-        # Topological sort for execution order
-        execution_order = self._get_execution_order(plan)
-
-        for task_id in execution_order:
-            task = plan.tasks[task_id]
-            model_id = assignments[task_id]
-
-            print(f"  Executing task {task_id[:8]}... with {model_id}")
-
-            # Get executor
-            capability = self.registry.get_capability(model_id)
-            if not capability:
-                print(f"    ERROR: Unknown model {model_id}")
-                continue
-
-            executor = self.executor_factory.get_executor(capability.provider)
-
-            # Execute
-            artifact = executor.execute(
-                task=task,
-                model_id=model_id,
-                system_prompt="You are a helpful AI assistant. Provide clear, accurate responses."
+        for ready_set in ready_sets:
+            # Execute all ready tasks concurrently
+            ready_tasks = [task_map[tid] for tid in ready_set]
+            results = await asyncio.gather(
+                *[self._execute_task(task, artifacts, stream_cb) for task in ready_tasks],
+                return_exceptions=True
             )
 
-            artifacts.append(artifact)
-            completed_tasks.add(task_id)
-
-            # Update task status
-            if artifact.success:
-                task.status = TaskStatus.COMPLETED
-                print(f"    ✓ Success ({artifact.token_usage.get('total', 0)} tokens, {artifact.latency_ms:.0f}ms)")
-            else:
-                task.status = TaskStatus.FAILED
-                print(f"    ✗ Failed: {artifact.error}")
+            for task, result in zip(ready_tasks, results):
+                if isinstance(result, Exception):
+                    artifacts[task["id"]] = {
+                        "task_id": task["id"],
+                        "content": "",
+                        "meta": {"error": str(result)}
+                    }
+                else:
+                    artifacts[task["id"]] = result
 
         return artifacts
 
-    def _verify_artifacts(self, artifacts: List[ExecutionArtifact],
-                         tasks: Dict[str, Task]) -> List[VerificationResult]:
-        """Verify all artifacts"""
-        verifications = []
+    async def run(self, user_input: str, stream: bool = False) -> AsyncIterator[Dict] if stream else Dict:
+        """Main orchestration loop with optional streaming."""
+        run_id = self.journal.create_run(user_input)
 
-        for artifact in artifacts:
-            task = tasks.get(artifact.task_id)
-            if not task:
-                continue
+        async def emit(event: Dict):
+            if stream and stream_cb:
+                await stream_cb(event)
 
-            verification = self.verifier.verify(artifact, task)
-            verifications.append(verification)
+        stream_cb = emit if stream else None
 
-            status = "✓ PASS" if verification.passed else "✗ FAIL"
-            print(f"    {artifact.task_id[:8]}: {status} (score: {verification.score:.2f})")
+        try:
+            # Planning
+            if stream_cb:
+                await stream_cb({"type": "plan", "status": "started"})
 
-        return verifications
+            task_graph = await make_plan(user_input)
+            self.journal.save_plan(run_id, task_graph)
 
-    def _get_execution_order(self, plan) -> List[str]:
-        """
-        Get task execution order using topological sort
+            if stream_cb:
+                await stream_cb({"type": "plan", "status": "completed", "task_count": len(task_graph["tasks"])})
 
-        Returns:
-            List of task IDs in execution order
-        """
-        # Simple topological sort
-        visited = set()
-        order = []
-
-        def visit(task_id: str):
-            if task_id in visited:
-                return
-
-            task = plan.tasks[task_id]
-
-            # Visit dependencies first
-            for dep_id in task.dependencies:
-                if dep_id in plan.tasks:
-                    visit(dep_id)
-
-            visited.add(task_id)
-            order.append(task_id)
-
-        # Start from root tasks
-        for root_id in plan.root_task_ids:
-            visit(root_id)
-
-        # Visit any remaining tasks (shouldn't happen with proper DAG)
-        for task_id in plan.tasks:
-            if task_id not in visited:
-                visit(task_id)
-
-        return order
-
-    def _calculate_total_cost(self, artifacts: List[ExecutionArtifact]) -> float:
-        """Calculate total cost from all artifacts"""
-        total_cost = 0.0
-
-        for artifact in artifacts:
-            capability = self.registry.get_capability(artifact.model_id)
-            if not capability:
-                continue
-
-            total_tokens = artifact.token_usage.get("total", 0)
-            cost = (total_tokens / 1000.0) * capability.cost_per_1k_tokens
-            total_cost += cost
-
-        return total_cost
-
-    def _update_telemetry(self, artifacts: List[ExecutionArtifact]):
-        """Update registry telemetry from artifacts"""
-        for artifact in artifacts:
-            capability = self.registry.get_capability(artifact.model_id)
-            if not capability:
-                continue
-
-            total_tokens = artifact.token_usage.get("total", 0)
-            cost = (total_tokens / 1000.0) * capability.cost_per_1k_tokens
-
-            self.registry.update_telemetry(
-                model_id=artifact.model_id,
-                success=artifact.success,
-                latency_ms=artifact.latency_ms,
-                tokens_used=total_tokens,
-                cost=cost
+            # Execution
+            artifacts = await self._execute_parallel(
+                task_graph["tasks"],
+                task_graph["edges"],
+                stream_cb
             )
 
-    def _generate_run_id(self) -> str:
-        """Generate unique run ID"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid.uuid4())[:8]
-        return f"{timestamp}_{unique_id}"
+            # Assembly
+            if stream_cb:
+                await stream_cb({"type": "assemble_start"})
 
-    def get_stats(self) -> Dict[str, Any]:
-        """Get engine statistics"""
-        return {
-            "registry": self.registry.get_live_metrics("claude-3-7-sonnet-20250219"),
-            "journal": self.journal.get_stats(),
-            "artifacts": self.artifact_store.get_stats(),
-            "router": self.router.get_routing_stats()
-        }
+            final_output = assemble_artifacts(list(artifacts.values()), strategy="concatenate")
 
-    def get_last_trace(self) -> Optional[RunTrace]:
-        """Get the most recent run trace"""
-        if not self.current_run_id:
-            # Get from journal
-            recent = self.journal.get_recent(limit=1)
-            return recent[0] if recent else None
+            if stream_cb:
+                await stream_cb({"type": "final", "output": final_output})
 
-        return self.journal.retrieve(self.current_run_id)
+            # Finalize
+            stats = self.telemetry.finalize_run()
+            self.journal.save_result(run_id, final_output, stats)
 
-    def replay_run(self, run_id: str) -> Optional[RunTrace]:
-        """
-        Replay a previous run for debugging
+            if stream_cb:
+                await stream_cb({"type": "stats", "stats": stats})
 
-        Args:
-            run_id: Run identifier
+            if stream:
+                return
+            else:
+                return {
+                    "run_id": run_id,
+                    "output": final_output,
+                    "stats": stats
+                }
 
-        Returns:
-            RunTrace or None if not found
-        """
-        return self.journal.retrieve(run_id)
-
-    def set_routing_override(self, task_type: str, model_id: str):
-        """Set a routing override for a task type"""
-        self.router.set_override(task_type, model_id)
-
-    def clear_routing_override(self, task_type: str):
-        """Clear a routing override"""
-        self.router.remove_override(task_type)
+        except Exception as e:
+            if stream_cb:
+                await stream_cb({"type": "error", "message": str(e)})
+            raise

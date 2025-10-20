@@ -1,7 +1,3 @@
-"""
-Planner module - Converts prompts into executable task DAGs
-"""
+from ai3core.planner.llm_planner import make_plan
 
-from .planner import Planner
-
-__all__ = ["Planner"]
+__all__ = ["make_plan"]
