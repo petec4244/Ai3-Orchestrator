@@ -13,6 +13,6 @@ This is Stovepipe 1: The core decision engine that handles:
 
 __version__ = "1.0.0"
 
-from .engine import Ai3Engine
+from .engine import Ai3Core
 
-__all__ = ["Ai3Engine"]
+__all__ = ["Ai3Core"]

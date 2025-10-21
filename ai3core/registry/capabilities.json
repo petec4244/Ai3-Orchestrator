@@ -1,49 +1,136 @@
 {
-  "providers": {
+  "telemetry_window_hours": 24,
+  "models": {
     "anthropic-claude": {
-      "name": "Anthropic Claude",
-      "model": "claude-3-7-sonnet-latest",
-      "capabilities": {
-        "primary": ["reasoning", "text-generation", "analysis"],
-        "secondary": ["coding", "creative-writing"],
-        "quality_score": 0.92
+      "provider": "anthropic",
+      "skills": {
+        "reasoning": 0.95,
+        "text-generation": 0.92,
+        "analysis": 0.93,
+        "coding": 0.88,
+        "creative-writing": 0.90
       },
+      "context_window": 200000,
       "cost_per_1k_tokens": 0.003,
-      "max_tokens": 200000,
-      "rate_limit": {
-        "requests_per_minute": 50,
-        "tokens_per_minute": 40000
-      }
+      "avg_latency_ms": 1500,
+      "error_rate": 0.02,
+      "supports_streaming": true,
+      "supports_vision": false,
+      "supports_function_calling": true,
+      "max_output_tokens": 16384,
+      "notes": "Claude 3.7 Sonnet - Balanced performance and cost"
     },
     "openai-gpt4": {
-      "name": "OpenAI GPT-4",
-      "model": "gpt-4",
-      "capabilities": {
-        "primary": ["text-generation", "reasoning"],
-        "secondary": ["coding", "analysis"],
-        "quality_score": 0.88
+      "provider": "openai",
+      "skills": {
+        "text-generation": 0.90,
+        "reasoning": 0.88,
+        "coding": 0.85,
+        "analysis": 0.87
       },
+      "context_window": 8192,
       "cost_per_1k_tokens": 0.03,
-      "max_tokens": 8192,
-      "rate_limit": {
-        "requests_per_minute": 60,
-        "tokens_per_minute": 90000
-      }
+      "avg_latency_ms": 2000,
+      "error_rate": 0.03,
+      "supports_streaming": true,
+      "supports_vision": false,
+      "supports_function_calling": true,
+      "max_output_tokens": 4096,
+      "notes": "GPT-4 - Reliable general purpose model"
     },
     "openai-gpt35": {
-      "name": "OpenAI GPT-3.5 Turbo",
-      "model": "gpt-3.5-turbo",
-      "capabilities": {
-        "primary": ["text-generation"],
-        "secondary": ["reasoning"],
-        "quality_score": 0.75
+      "provider": "openai",
+      "skills": {
+        "text-generation": 0.78,
+        "reasoning": 0.72
       },
+      "context_window": 4096,
       "cost_per_1k_tokens": 0.001,
-      "max_tokens": 4096,
-      "rate_limit": {
-        "requests_per_minute": 100,
-        "tokens_per_minute": 150000
-      }
+      "avg_latency_ms": 1000,
+      "error_rate": 0.05,
+      "supports_streaming": true,
+      "supports_vision": false,
+      "supports_function_calling": true,
+      "max_output_tokens": 4096,
+      "notes": "GPT-3.5 Turbo - Fast and economical"
+    },
+    "xai-grok4": {
+      "provider": "xai",
+      "skills": {
+        "reasoning": 0.95,
+        "analysis": 0.94,
+        "coding": 0.92,
+        "text-generation": 0.90,
+        "creative-writing": 0.88,
+        "real-time-search": 0.95,
+        "mathematical-reasoning": 0.94
+      },
+      "context_window": 256000,
+      "cost_per_1k_tokens": 0.018,
+      "avg_latency_ms": 2500,
+      "error_rate": 0.02,
+      "supports_streaming": true,
+      "supports_vision": true,
+      "supports_function_calling": true,
+      "max_output_tokens": 16384,
+      "notes": "Grok 4 - Premium model with advanced reasoning and real-time search capabilities"
+    },
+    "xai-grok4-fast": {
+      "provider": "xai",
+      "skills": {
+        "reasoning": 0.90,
+        "text-generation": 0.92,
+        "analysis": 0.89,
+        "coding": 0.88,
+        "real-time-search": 0.93,
+        "creative-writing": 0.87
+      },
+      "context_window": 2000000,
+      "cost_per_1k_tokens": 0.0007,
+      "avg_latency_ms": 1200,
+      "error_rate": 0.02,
+      "supports_streaming": true,
+      "supports_vision": true,
+      "supports_function_calling": true,
+      "max_output_tokens": 8192,
+      "notes": "Grok 4 Fast - Cost-effective model with massive 2M context window, 98% cheaper than Grok 4 for same performance"
+    },
+    "xai-grok4-fast-reasoning": {
+      "provider": "xai",
+      "skills": {
+        "reasoning": 0.92,
+        "analysis": 0.91,
+        "mathematical-reasoning": 0.94,
+        "coding": 0.89,
+        "text-generation": 0.88
+      },
+      "context_window": 2000000,
+      "cost_per_1k_tokens": 0.0007,
+      "avg_latency_ms": 1500,
+      "error_rate": 0.02,
+      "supports_streaming": true,
+      "supports_vision": true,
+      "supports_function_calling": true,
+      "max_output_tokens": 8192,
+      "notes": "Grok 4 Fast Reasoning - Optimized for complex reasoning tasks with 2M context"
+    },
+    "xai-grok3": {
+      "provider": "xai",
+      "skills": {
+        "reasoning": 0.85,
+        "text-generation": 0.86,
+        "analysis": 0.84,
+        "coding": 0.82
+      },
+      "context_window": 131072,
+      "cost_per_1k_tokens": 0.012,
+      "avg_latency_ms": 1800,
+      "error_rate": 0.03,
+      "supports_streaming": true,
+      "supports_vision": false,
+      "supports_function_calling": true,
+      "max_output_tokens": 4096,
+      "notes": "Grok 3 - Previous generation model with strong performance"
     }
   }
 }

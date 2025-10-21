@@ -13,6 +13,10 @@ class XAIAdapter(BaseExecutor):
     """Adapter for xAI Grok models"""
 
     VALID_MODELS = [
+        "grok-4",
+        "grok-4-fast",
+        "grok-4-fast-reasoning",
+        "grok-4-fast-non-reasoning",
         "grok-3",
         "grok-2-latest",
         "grok-2"

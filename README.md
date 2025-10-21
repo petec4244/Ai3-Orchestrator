@@ -9,6 +9,7 @@ Multi-LLM orchestration engine with intelligent routing, parallel execution, str
 - **Streaming**: Server-Sent Events (SSE) for real-time progress
 - **Self-Verification**: Quality checks with auto-repair and model fallback
 - **Telemetry-Driven Routing**: Dynamic provider selection based on success rate, latency, and cost
+- **Multi-Provider Support**: Anthropic (Claude), OpenAI (GPT-4), xAI (Grok 3/4)
 - **CLI & API**: Both streaming and non-streaming interfaces
 
 ## Quick Start
@@ -35,18 +36,42 @@ uv pip install -r requirements.txt
 
 ### Environment Variables
 
-```bash
-# Required
-export ANTHROPIC_API_KEY=your_key_here
-export OPENAI_API_KEY=your_key_here
+You can configure API keys using **either** method:
 
-# Optional
-export AI3_PLANNER_MODEL=claude-3-7-sonnet-latest
-export AI3_MAX_CONCURRENCY=5
-export AI3_MAX_CONCURRENCY_PER_PROVIDER=3
-export AI3_VERIFY=on
-export AI3_REPAIR_LIMIT=1
+**Option 1: .env file (recommended)**
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env with your actual keys
+ANTHROPIC_API_KEY=your_anthropic_key_here
+OPENAI_API_KEY=your_openai_key_here
+XAI_API_KEY=your_xai_key_here
 ```
+
+**Option 2: System environment variables**
+```bash
+# Linux/macOS
+export ANTHROPIC_API_KEY=your_anthropic_key_here
+export OPENAI_API_KEY=your_openai_key_here
+export XAI_API_KEY=your_xai_key_here
+
+# Windows (PowerShell)
+$env:ANTHROPIC_API_KEY="your_anthropic_key_here"
+$env:OPENAI_API_KEY="your_openai_key_here"
+$env:XAI_API_KEY="your_xai_key_here"
+```
+
+**Optional Configuration**
+```bash
+AI3_PLANNER_MODEL=claude-3-7-sonnet-latest
+AI3_MAX_CONCURRENCY=5
+AI3_MAX_CONCURRENCY_PER_PROVIDER=3
+AI3_VERIFY=on
+AI3_REPAIR_LIMIT=1
+```
+
+Note: System environment variables take priority over .env file values.
 
 ### CLI Usage
 
@@ -81,10 +106,22 @@ curl -X POST http://localhost:8000/stream/run \
 
 ## Architecture
 
-### Two-Stovepipe Design
+### Core Components
 
-- **Ai3Core**: Orchestration engine (planner, router, executor, verifier, assembler, telemetry)
-- **Interface**: CLI and future VS Code extension (no orchestration logic)
+**Ai3Core** - The orchestration engine with the following modules:
+
+- **Planner** (`ai3core/planner/`) - LLM-based task decomposition and dependency graphs
+- **Registry** (`ai3core/registry/`) - Model capabilities and telemetry tracking
+- **Router** (`ai3core/router/`) - Intelligent provider selection with weighted scoring
+- **Executor** (`ai3core/executor/`) - Parallel task execution with scheduler
+- **Verifier** (`ai3core/verifier/`) - Quality checks, repair, and fallback logic
+- **Assembler** (`ai3core/assembler/`) - Result synthesis and merging
+- **Journal** (`ai3core/journal/`) - Run persistence and artifact storage
+- **Telemetry** (`ai3core/telemetry/`) - Performance metrics collection
+
+**Interface Layer**:
+- **CLI** (`interface/cli/`) - Command-line interface
+- **API** (`api/`) - FastAPI REST endpoints with streaming support
 
 ### Execution Flow
 
@@ -94,6 +131,12 @@ curl -X POST http://localhost:8000/stream/run \
 4. **Verify**: Quality checks with optional repair subtask or fallback to next-best model
 5. **Assemble**: Merge artifacts into final output
 6. **Journal**: Persist run trace and telemetry
+
+### Supported Providers & Models
+
+- **Anthropic**: Claude 3.7 Sonnet (200K context, excellent coding)
+- **OpenAI**: GPT-4, GPT-3.5 Turbo (reliable general-purpose)
+- **xAI**: Grok 3, Grok 4, Grok 4 Fast (2M context, advanced reasoning)
 
 ### Streaming Events
 
@@ -134,6 +177,27 @@ All settings in `ai3core/settings.py`:
 | AI3_VERIFY | on | Enable verification |
 | AI3_REPAIR_LIMIT | 1 | Max repair attempts |
 
+## Project Structure
+
+```
+ai3_orchestrator/
+├── ai3core/              # Core orchestration engine
+│   ├── planner/         # Task planning and dependency graphs
+│   ├── registry/        # Model capabilities database
+│   ├── router/          # Provider selection logic
+│   ├── executor/        # Parallel task execution
+│   ├── providers/       # Provider adapters (Anthropic, OpenAI, xAI)
+│   ├── verifier/        # Quality verification
+│   ├── assembler/       # Result assembly
+│   ├── journal/         # Persistence layer
+│   └── telemetry/       # Metrics collection
+├── interface/
+│   └── cli/             # Command-line interface
+├── api/                 # FastAPI REST endpoints
+├── tests/               # Test suite
+└── vscode-extension/    # VS Code extension (in development)
+```
+
 ## Roadmap
 
 - [x] LLM-based planner with JSON schema validation
@@ -141,6 +205,7 @@ All settings in `ai3core/settings.py`:
 - [x] Streaming via SSE
 - [x] Verifier with repair and fallback
 - [x] Telemetry-driven routing
+- [x] xAI Grok integration
 - [ ] VS Code extension integration
 - [ ] Advanced assembly strategies (voting, ranked choice)
 - [ ] Persistent caching layer

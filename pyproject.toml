@@ -13,6 +13,9 @@ dependencies = [
     "click>=8.1.7",
     "anthropic>=0.7.0",
     "openai>=1.3.0",
+    "httpx>=0.25.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -25,8 +28,11 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
+[tool.hatch.build.targets.wheel]
+packages = ["ai3core", "api", "backend", "interface"]
+
+[dependency-groups]
+dev = [
     "pytest>=7.4.3",
     "pytest-asyncio>=0.21.1",
 ]

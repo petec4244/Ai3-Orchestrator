@@ -6,6 +6,7 @@ from ai3core.router.selector import select_provider
 from ai3core.executor.scheduler import compute_ready_sets, ConcurrencyLimiter
 from ai3core.providers.anthropic import AnthropicProvider
 from ai3core.providers.openai import OpenAIProvider
+from ai3core.providers.xai import XAIProvider
 from ai3core.verifier.verify import verify_artifact, should_repair, should_fallback
 from ai3core.assembler.strategies import assemble_artifacts
 from ai3core.journal.store import JournalStore
@@ -27,6 +28,8 @@ class Ai3Core:
             return AnthropicProvider()
         elif "openai" in provider_name.lower():
             return OpenAIProvider()
+        elif "xai" in provider_name.lower() or "grok" in provider_name.lower():
+            return XAIProvider()
         else:
             return AnthropicProvider()  # Default fallback
 

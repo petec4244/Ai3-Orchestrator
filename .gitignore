@@ -66,6 +66,8 @@ htmlcov/
 *.log
 *.log.*
 logs/
+runs/
+telemetry/
 *.sql
 *.sqlite
 *.sqlite3
@@ -74,6 +76,7 @@ logs/
 # IDE and editor files
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *.sw?
@@ -94,6 +97,7 @@ logs/
 *.factorypath
 .settings/
 .buildpath
+uv.lock
 *.xcworkspace
 *.xcuserstate
 
